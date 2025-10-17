@@ -70,7 +70,7 @@
       <div class="rides" id="rides"></div>
       <div style="margin-top:16px;text-align:center;display:flex;gap:10px;justify-content:center;">
         <button id="addTransfer">↓乗り継ぎ追加</button>
-        <button id="addRide">＋乗車追加</button>
+<!--<button id="addRide">＋乗車追加</button>-->        
         <button id="clearAll" class="danger">一括削除</button>
       </div>
     </div>
@@ -182,7 +182,7 @@
       outputEl.innerHTML=html;
     }
 
-    addRideBtn.onclick=()=>createRide();
+  //    addRideBtn.onclick=()=>createRide();
     addTransferBtn.onclick=()=>{
       const rides=[...ridesEl.querySelectorAll('.ride')];
       if(!rides.length){createRide();return;}
