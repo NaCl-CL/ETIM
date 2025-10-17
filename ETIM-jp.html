@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ETIM-JP</title>
+  <style>
+    body{font-family:'Roboto','Noto Sans JP',sans-serif;background:#f9fafb;margin:0;padding:24px;color:#202124;}
+    .container{max-width:900px;margin:0 auto;}
+    h1{font-size:22px;margin-bottom:12px;}
+    .card{background:#fff;border:1px solid #dadce0;border-radius:12px;padding:20px;margin-bottom:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1);}
+    label{font-size:13px;color:#5f6368;display:block;margin-bottom:4px;}
+    input,select,textarea{border:1px solid #dadce0;border-radius:8px;padding:8px 10px;width:100%;font-size:14px;box-sizing:border-box;}
+    button{background:#1a73e8;color:#fff;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;transition:0.2s;}
+    button:hover{background:#1557b0;}
+    button.danger{background:#d93025;}
+    button.danger:hover{background:#a52714;}
+    button.full{width:100%;margin-top:10px;}
+
+    .rides{display:flex;flex-direction:column;gap:10px;margin-top:10px;}
+    .ride{border:1px solid #dadce0;padding:12px;border-radius:10px;position:relative;}
+    .delete{position:absolute;right:10px;top:10px;background:#f8f9fa;color:#d93025;border:1px solid #dadce0;}
+    .delete:hover{background:#fce8e6;}
+
+    .timeline{border-left:2px solid #c6c6c6;padding-left:20px;text-align:left;}
+    .station{position:relative;margin-bottom:16px;}
+    .station::before{content:'';position:absolute;left:-7px;top:6px;width:8px;height:8px;background:#1a73e8;border-radius:50%;}
+    .station-row{display:flex;align-items:flex-start;gap:10px;}
+    .station-name{font-weight:600;font-size:15px;text-align:left;}
+    .station-times{font-size:12px;color:#333;display:flex;flex-direction:column;align-items:flex-end;width:70px;}
+    .segment-info{font-size:13px;color:#444;margin:4px 0 10px 30px;border-left:2px solid #e0e0e0;padding-left:8px;}
+    .divider{border-top:1px dashed #ccc;margin:10px 0;}
+
+    .output-toolbar{display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px;}
+    .ver{
+      text-align: right;
+      color: #5f6368;
+      font-size: 20%;
+    }
+    @media print{
+      body{margin:15mm;}
+      #inputArea,button{display:none!important;}
+    }
+    .setting{
+      background-color: #444;
+    
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+
+    <div class="card" id="inputArea">
+      <a href="index.html">
+        <img src="photo/logo.png" alt="">
+      </a>
+      <br>
+      <button type=“button” class="setting" onclick="location.href='index.html'">TOPへ</button>
+      <button type=“button” class="setting" onclick="location.href='index.html#attention'">利用規約</button>
+        
+      <p class="ver">(Ver.1_2025/10/17)</p>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div><label>旅行タイトル</label><input id="tripTitle" placeholder="例：秋の旅行祭り"></div>
+        <div><label>通し番号（印刷時に右上に表示）</label><input id="tripNumber" type="text" placeholder="例：No.001"></div>
+        <div><label>旅行予定日</label><input id="tripDate" type="date"></div>
+        <div><label>作成日</label><input id="createdDate" type="date"></div>
+        <div><label>作者名</label><input id="author" placeholder="Name"></div>
+      </div>
+      <div class="rides" id="rides"></div>
+      <div style="margin-top:16px;text-align:center;display:flex;gap:10px;justify-content:center;">
+        <button id="addTransfer">↓乗り継ぎ追加</button>
+        <button id="addRide">＋乗車追加</button>
+        <button id="clearAll" class="danger">一括削除</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="output-toolbar">
+        <button id="generate">生成</button>
+        <button id="exportPdf">印刷 / PDF</button>
+      </div>
+      <div id="output"></div>
+    </div>
+    <div id="output"></div>
+    <img src="photo/logo.png" alt="" >
+  </div>
+
+  <script>
+    const ridesEl=document.getElementById('rides');
+    const addRideBtn=document.getElementById('addRide');
+    const addTransferBtn=document.getElementById('addTransfer');
+    const generateBtn=document.getElementById('generate');
+    const exportPdfBtn=document.getElementById('exportPdf');
+    const clearAllBtn=document.getElementById('clearAll');
+    const outputEl=document.getElementById('output');
+    const tripDateEl=document.getElementById('tripDate');
+    const createdDateEl=document.getElementById('createdDate');
+    const authorEl=document.getElementById('author');
+    const tripTitleEl=document.getElementById('tripTitle');
+    const tripNumberEl=document.getElementById('tripNumber');
+
+    const transportTypes=['鉄道','バス','タクシー','飛行機','船','車','徒歩'];
+
+    function createRide(data={}){
+      const div=document.createElement('div');
+      div.className='ride';
+      div.innerHTML=`
+        <strong>乗車情報</strong>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div>
+            <label>発駅</label>
+            <input type="text" class="fromStation" placeholder="発駅" value="${data.from||''}">
+            <label>発時刻</label>
+            <input type="time" class="fromTime" value="${data.fromTime||''}">
+          </div>
+          <div>
+            <label>着駅</label>
+            <input type="text" class="toStation" placeholder="着駅" value="${data.to||''}">
+            <label>着時刻</label>
+            <input type="time" class="toTime" value="${data.toTime||''}">
+          </div>
+        </div>
+        <label>交通種類</label>
+        <select class="transportType">${transportTypes.map(t=>`<option value="${t}" ${data.transport===t?'selected':''}>${t}</option>`).join('')}</select>
+        <label>路線名 / 列車名</label>
+        <input type="text" class="lineName" value="${data.line||''}">
+        <label>号車 / 座席</label>
+        <div style="display:flex;gap:6px"><input type="text" class="carNumber" placeholder="号車" style="width:80px" value="${data.carNumber||''}"><input type="text" class="seat" placeholder="座席番号" value="${data.seat||''}"></div>
+        <label>コメント（任意）</label>
+        <textarea class="comment" placeholder="メモや注意事項など">${data.comment||''}</textarea>
+        <button class="delete">削除</button>
+      `;
+      div.querySelector('.delete').onclick=()=>{div.remove();saveData();};
+      ridesEl.appendChild(div);
+      saveData();
+    }
+
+    function collectData(){
+      return {
+        title:tripTitleEl.value,
+        number:tripNumberEl.value,
+        date:tripDateEl.value,
+        created:createdDateEl.value,
+        author:authorEl.value,
+        rides:[...ridesEl.querySelectorAll('.ride')].map(r=>(
+          {
+            from:r.querySelector('.fromStation').value,
+            fromTime:r.querySelector('.fromTime').value,
+            to:r.querySelector('.toStation').value,
+            toTime:r.querySelector('.toTime').value,
+            transport:r.querySelector('.transportType').value,
+            line:r.querySelector('.lineName').value,
+            carNumber:r.querySelector('.carNumber').value,
+            seat:r.querySelector('.seat').value,
+            comment:r.querySelector('.comment').value
+          }
+        ))
+      };
+    }
+
+    function saveData(){localStorage.setItem('itineraryData',JSON.stringify(collectData()));}
+
+    function renderTimeline(data){
+      const rides=data.rides.filter(r=>r.from||r.to).sort((a,b)=>(a.fromTime||'').localeCompare(b.fromTime||''));
+      let html=`<div><div style='display:flex;justify-content:space-between;'><h3>${data.title||''}</h3><div style='color:#666;font-size:13px;'>${data.number||''}</div></div>`;
+      html+=`<div style='color:#777;font-size:13px;'>旅行日:${data.date||''}　作成日:${data.created||''}　作者:${data.author||''}</div>`;
+      html+=`<div class='timeline'>`;
+      let stations=[];
+      rides.forEach((r,i)=>{
+        stations.push({name:r.from,dep:r.fromTime,arr:i>0?rides[i-1].toTime:''});
+        if(i===rides.length-1){stations.push({name:r.to,arr:r.toTime});}
+      });
+      const uniqueStations=[];
+      stations.forEach(s=>{if(!uniqueStations.find(u=>u.name===s.name)) uniqueStations.push(s);});
+      uniqueStations.forEach((s,i)=>{
+        html+=`<div class='station'><div class='station-row'><div class='station-times'>${s.arr?`<span>${s.arr} 着</span>`:''}${s.dep?`<span>${s.dep} 発</span>`:''}</div><div class='station-name'>${s.name}</div></div>`;
+        if(i<rides.length){const r=rides[i];if(r) html+=`<div class='segment-info'>${r.transport||''} ｜ ${r.line||''} ${r.carNumber?`${r.carNumber}号車`:''} ${r.seat||''}${r.comment?`<div style='color:#666;font-size:12px;margin-top:2px;'>${r.comment}</div>`:''}</div>`;}
+        html+=`</div>${i<uniqueStations.length-1?`<div class='divider'></div>`:''}`;
+      });
+      html+=`</div></div>`;
+      outputEl.innerHTML=html;
+    }
+
+    addRideBtn.onclick=()=>createRide();
+    addTransferBtn.onclick=()=>{
+      const rides=[...ridesEl.querySelectorAll('.ride')];
+      if(!rides.length){createRide();return;}
+      const last=rides[rides.length-1];
+      createRide({from:last.querySelector('.toStation').value});
+    };
+    generateBtn.onclick=()=>{renderTimeline(collectData());saveData();};
+    clearAllBtn.onclick=()=>{if(confirm('すべて削除しますか？')){ridesEl.innerHTML='';saveData();}};
+    exportPdfBtn.onclick=()=>{generateBtn.click();document.getElementById('inputArea').style.display='none';window.print();document.getElementById('inputArea').style.display='';};
+
+    window.onload=()=>{
+      const data=JSON.parse(localStorage.getItem('itineraryData')||'{}');
+      if(data.rides){
+        tripTitleEl.value=data.title||'';
+        tripNumberEl.value=data.number||'';
+        tripDateEl.value=data.date||'';
+        createdDateEl.value=data.created||'';
+        authorEl.value=data.author||'';
+        data.rides.forEach(r=>createRide(r));
+      }else createRide();
+    };
+  </script>
+</body>
+</html>
